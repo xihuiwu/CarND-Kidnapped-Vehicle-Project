@@ -32,7 +32,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
    * NOTE: Consult particle_filter.h for more information about this method 
    *   (and others in this file).
    */
-  this->num_particles = 50;  // TODO: Set the number of particles
+  this->num_particles = 10;  // TODO: Set the number of particles
   std::normal_distribution<double> dist_x(x, std[0]);
   std::normal_distribution<double> dist_y(y, std[1]);
   std::normal_distribution<double> dist_theta(theta, std[2]);
@@ -64,9 +64,9 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   std::normal_distribution<double> dist_theta(0.0, std_pos[2]);
   
   for (auto &p : this->particles){
-  	p.x += (velocity/yaw_rate)*(sin(p.theta + yaw_rate*delta_t) - sin(p.theta)) + dist_x(generator);
-    p.y += (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate*delta_t)) + dist_y(generator);
-    p.theta += yaw_rate*delta_t + dist_theta(generator);
+  	p.x = p.x + (velocity/yaw_rate)*(sin(p.theta + yaw_rate*delta_t) - sin(p.theta)) + dist_x(generator);
+    p.y = p.y + (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate*delta_t)) + dist_y(generator);
+    p.theta = p.theta + yaw_rate*delta_t + dist_theta(generator);
   }
 }
 
@@ -123,7 +123,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
         sensed.push_back(LandmarkObs{l.id_i, l.x_f, l.y_f});
       }
       */
-      if (std::fabs(dx) < sensor_range && std::fabs(dy) < sensor_range){
+      if (std::fabs(dx) <= sensor_range && std::fabs(dy) <= sensor_range){
       	sensed.push_back(LandmarkObs{l.id_i, l.x_f, l.y_f});
       }
     }
@@ -176,7 +176,8 @@ void ParticleFilter::resample() {
    * NOTE: You may find std::discrete_distribution helpful here.
    *   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
    */
-  vector<Particle> res;
+  std::vector<Particle> res;
+  std::vector<double> new_weights;
   
   // create a uniform distribution between 0 and max_weight
   double w_max = *max_element(this->weights.begin(), this->weights.end());
@@ -194,9 +195,11 @@ void ParticleFilter::resample() {
       index = (index + 1) % this->num_particles;
     }
     res.push_back(this->particles[index]);
+    new_weights.push_back(this->particles[index].weight);
   }
   
-  particles = res;
+  this->particles = res;
+  this->weights = new_weights;
 }
 
 void ParticleFilter::SetAssociations(Particle& particle, 
