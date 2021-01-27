@@ -23,6 +23,8 @@ using std::vector;
 
 static std::default_random_engine generator;
 
+#define EPS 0.00001
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
   /**
    * TODO: Set the number of particles. Initialize all particles to 
@@ -64,9 +66,19 @@ void ParticleFilter::prediction(double delta_t, double std_pos[],
   std::normal_distribution<double> dist_theta(0.0, std_pos[2]);
   
   for (auto &p : this->particles){
-  	p.x = p.x + (velocity/yaw_rate)*(sin(p.theta + yaw_rate*delta_t) - sin(p.theta)) + dist_x(generator);
-    p.y = p.y + (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate*delta_t)) + dist_y(generator);
-    p.theta = p.theta + yaw_rate*delta_t + dist_theta(generator);
+    if (std::fabs(yaw_rate) >= EPS){
+      p.x = p.x + (velocity/yaw_rate)*(sin(p.theta + yaw_rate*delta_t) - sin(p.theta));
+      p.y = p.y + (velocity/yaw_rate)*(cos(p.theta) - cos(p.theta + yaw_rate*delta_t));
+      p.theta = p.theta + yaw_rate*delta_t;
+    }
+    else{
+      p.x = p.x + velocity*delta_t*cos(p.theta);
+      p.y = p.y + velocity*delta_t*sin(p.theta);
+    }
+
+    p.x = p.x + dist_x(generator);
+    p.y = p.y + dist_y(generator);
+    p.theta = p.theta + dist_theta(generator);
   }
 }
 
@@ -178,26 +190,15 @@ void ParticleFilter::resample() {
    */
   std::vector<Particle> res;
   std::vector<double> new_weights;
+  std::discrete_distribution<int> idx_dist(this->weights.begin(), this->weights.end());
   
-  // create a uniform distribution between 0 and max_weight
-  double w_max = *max_element(this->weights.begin(), this->weights.end());
-  std::uniform_real_distribution<double> unirealdist(0.0, w_max);
   
-  // randomly choose a particle to start
-  std::uniform_int_distribution<int> uniselect(0, this->num_particles-1);
-  int index = uniselect(generator);
-  
-  double beta = 0.0;
-  for (int i = 0; i < this->num_particles; i++) {
-    beta += unirealdist(generator) * 2.0;
-    while (beta > this->weights[index]) {
-      beta -= this->weights[index];
-      index = (index + 1) % this->num_particles;
-    }
-    res.push_back(this->particles[index]);
-    new_weights.push_back(this->particles[index].weight);
+  for(int i = 0; i < this->num_particles; i++)
+  {
+    int rand_idx = idx_dist(generator);
+    res.push_back(particles[rand_idx]);
+    new_weights.push_back(particles[rand_idx].weight);
   }
-  
   this->particles = res;
   this->weights = new_weights;
 }
